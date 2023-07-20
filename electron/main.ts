@@ -1,46 +1,61 @@
-import { app, BrowserWindow } from 'electron'
-import path from 'node:path'
+import { app, BrowserWindow, globalShortcut, Menu } from "electron";
+import path from "node:path";
 
-// The built directory structure
-//
-// ├─┬─┬ dist
-// │ │ └── index.html
-// │ │
-// │ ├─┬ dist-electron
-// │ │ ├── main.js
-// │ │ └── preload.js
-// │
-process.env.DIST = path.join(__dirname, '../dist')
-process.env.PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public')
+process.env.DIST = path.join(__dirname, "../dist");
+process.env.PUBLIC = app.isPackaged
+  ? process.env.DIST
+  : path.join(process.env.DIST, "../public");
 
-
-let win: BrowserWindow | null
-// 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
-const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
+let win: BrowserWindow | null;
+const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 
 function createWindow() {
   win = new BrowserWindow({
-    icon: path.join(process.env.PUBLIC, 'electron-vite.svg'),
+    // width: 1920,
+    // height: 1080,
+    transparent: true,
+    frame: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      // HACK: personal use only, extremely dangerous in production
+      nodeIntegration: true,
+      contextIsolation: false,
     },
-  })
-
-  // Test active push message to Renderer-process.
-  win.webContents.on('did-finish-load', () => {
-    win?.webContents.send('main-process-message', (new Date).toLocaleString())
-  })
+  });
 
   if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL)
+    win.loadURL(VITE_DEV_SERVER_URL);
   } else {
-    // win.loadFile('dist/index.html')
-    win.loadFile(path.join(process.env.DIST, 'index.html'))
+    win.loadFile(path.join(process.env.DIST, "index.html"));
   }
+
+  win.webContents.on("before-input-event", (_, input) => {
+    if (
+      input.type === "keyDown" &&
+      input.control &&
+      input.shift &&
+      input.key === "I"
+    ) {
+      if (win !== null) {
+        win.webContents.isDevToolsOpened()
+          ? win.webContents.closeDevTools()
+          : win.webContents.openDevTools({ mode: "right" });
+      }
+    }
+  });
 }
 
-app.on('window-all-closed', () => {
-  win = null
-})
+Menu.setApplicationMenu(null); // disable window closing on <C-w>
 
-app.whenReady().then(createWindow)
+app.on("window-all-closed", () => {
+  win = null;
+});
+
+(async () => {
+  await app.whenReady();
+
+  globalShortcut.register("Alt+CommandOrControl+I", () => {
+    console.log("Electron loves global shortcuts!");
+  });
+
+  createWindow();
+})();
